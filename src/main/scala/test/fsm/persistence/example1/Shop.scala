@@ -1,17 +1,13 @@
 package test.fsm.persistence.example1
 
 import java.util.UUID
-
 import akka.actor._
-
-import scala.util.control.NonFatal
+import scala.util.control._
 
 object Shop {
   def props = Props(new Shop)
 
   case object Enter
-  case class Restart(actor: ActorRef)
-
   case class Cart(actor: ActorRef)
 }
 class Shop extends Actor with ActorLogging {
@@ -21,29 +17,24 @@ class Shop extends Actor with ActorLogging {
 
   lazy val validator = context.actorOf(FraudDetector.props)
 
-  override def receive = running(Map.empty)
+  override def receive = running(Set.empty)
 
-  def running(carts: Map[ActorRef, String]): Receive = {
+  def running(carts: Set[ActorRef]): Receive = {
     case Shop.Enter =>
       val id = UUID.randomUUID().toString
-      context.become(running(carts + start(id)))
+      val actor = start(id)
+      log.debug(s"started new cart ${actor.path.name}")
+      sender() ! Shop.Cart(actor)
+      context.become(running(carts + actor))
 
-    case Shop.Restart(actor) if carts.contains(actor) =>
-      val id = carts(actor)
-      Thread.sleep(100) // to ensure 1st message processed
-      log.info(s"Emulate restart of visitor-actor: ${actor.path.name} ...")
-      context.system.stop(actor) // emulate actor's node restart
-      Thread.sleep(100)
-      context.become(running(carts + start(id)))
-
-    case Terminated(actor) =>
+    case Terminated(actor) if carts.contains(actor) =>
+      log.debug(s"cart ${actor.path.name} is finished ...")
       context.become(running(carts - actor))
   }
 
-  def start(id: String) = {
+  private def start(id: String): ActorRef =  {
     val actor = context.actorOf(Visitor.props(id, validator), s"visitor.$id")
-    sender() ! Shop.Cart(actor)
     context.watch(actor)
-    actor -> id
+    actor
   }
 }

@@ -15,29 +15,15 @@ class Example1Test extends WordSpecLike with TestKitBase with ImplicitSender wit
 
   val shop = system.actorOf(Shop.props)
 
-  def restart(actor: ActorRef) = {
-    shop ! Shop.Restart(actor)
-    expectMsgPF(1 second) {
-      case Shop.Cart(x) => x
-    }
-  }
-
   "restart visitor actor" in {
     logger.info("starting shopping ...")
     shop ! Shop.Enter
-    var actor = expectMsgPF(1 second) {
+    val cart = expectMsgPF(1 second) {
       case Shop.Cart(x) => x
     }
-
-    actor ! AddItem(Item("book.1", "Some name", 12))
-
-    actor = restart(actor)
-
-    actor ! AddItem(Item("journal.1", "Another name", 3))
-    actor ! Buy
-
-    actor = restart(actor)
-
+    cart ! AddItem(Item("book.1", "Some name", 12))
+    cart ! AddItem(Item("journal.1", "Another name", 3))
+    cart ! Buy
     expectMsgPF(1 second) {
       case Receipt(amount, code) if amount == 15 =>
         logger.info(s"Successfully purchased items (amount: $amount) and get code : $code")
