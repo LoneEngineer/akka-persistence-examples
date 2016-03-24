@@ -5,12 +5,12 @@ import akka.actor._
 import scala.util.control._
 
 object Shop {
-  def props = Props(new Shop)
+  def props(unstable: Boolean) = Props(new Shop(unstable))
 
   case object Enter
   case class Cart(actor: ActorRef)
 }
-class Shop extends Actor with ActorLogging {
+class Shop(unstable: Boolean) extends Actor with ActorLogging {
   override def supervisorStrategy: SupervisorStrategy = OneForOneStrategy()(SupervisorStrategy.defaultDecider.orElse {
     case NonFatal(_) => SupervisorStrategy.Restart
   })
@@ -33,7 +33,7 @@ class Shop extends Actor with ActorLogging {
   }
 
   private def start(id: String): ActorRef =  {
-    val actor = context.actorOf(Visitor.props(id, validator), s"visitor.$id")
+    val actor = context.actorOf(Visitor.props(id, validator, unstable), s"visitor.$id")
     context.watch(actor)
     actor
   }

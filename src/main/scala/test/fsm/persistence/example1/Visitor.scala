@@ -7,6 +7,7 @@ import akka.persistence.fsm.PersistentFSM
 import akka.persistence.fsm.PersistentFSM.FSMState
 import scala.concurrent.duration._
 import scala.reflect._
+import scala.util.Random
 
 
 sealed trait Command
@@ -57,20 +58,27 @@ case class NonEmptyShoppingCart(items: Seq[Item]) extends ShoppingCart {
 }
 
 object Visitor {
-  def props(id: String, validator: ActorRef) = Props(new Visitor(id, validator))
+  def props(id: String, validator: ActorRef, unstable: Boolean) = Props(new Visitor(id, validator, unstable))
 }
 
-class Visitor(id: String, validator: ActorRef) extends PersistentFSM[UserState, ShoppingCart, DomainEvent] with ActorLogging {
+class Visitor(id: String, validator: ActorRef, unstable: Boolean) extends PersistentFSM[UserState, ShoppingCart, DomainEvent] with ActorLogging {
 
   override val persistenceId: String = s"${context.system.name}.Visitor.$id.v1"
   override def domainEventClassTag: ClassTag[DomainEvent] = classTag[DomainEvent]
   override def applyEvent(event: DomainEvent, cartBeforeEvent: ShoppingCart): ShoppingCart = {
+    // log.info(s"-- $id : apply event($event)")
     event match {
       case ItemAdded(item) => cartBeforeEvent.addItem(item)
       case OrderDiscarded  => cartBeforeEvent.empty()
       case OrderExecuted   => cartBeforeEvent
       case OrderPaid       => cartBeforeEvent
     }
+  }
+
+  val rnd = new Random()
+  def mayFail = {
+    if (unstable && rnd.nextDouble() < 0.2)
+      throw new IllegalStateException(s"$id eventually crashed")
   }
 
   startWith(LookingAround, EmptyShoppingCart)
@@ -97,6 +105,7 @@ class Visitor(id: String, validator: ActorRef) extends PersistentFSM[UserState, 
     case Event(Buy, _) =>
       goto(Validation) applying OrderExecuted andThen {
         case cart =>
+          mayFail // <-- this is point of unrecoverable failure for flow
           validator ! FraudDetector.Validate(sender().path, cart.amount)
       }
     case Event(Leave, _) =>

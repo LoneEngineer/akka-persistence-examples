@@ -21,9 +21,8 @@ class Example1Test extends WordSpecLike with TestKitBase with ImplicitSender wit
   implicit val pc = PatienceConfig(timeout = 35 seconds)
   val runs = 20
 
-  val shop = system.actorOf(Shop.props)
-
-  "restart visitor actor" in {
+  "multiple visitors" in {
+    val shop = system.actorOf(Shop.props(false))
     val tests = for {i <- 1 to runs} yield {
         shop ! Shop.Enter
         val cart = expectMsgPF(1 second) {
@@ -32,9 +31,27 @@ class Example1Test extends WordSpecLike with TestKitBase with ImplicitSender wit
         logger.info(s"starting shopping with ${cart.path.name} ...")
         cart ! AddItem(Item("book.1", "Some name", 12))
         cart ! AddItem(Item("journal.1", "Another name", 3))
-        cart ? Buy
+        (cart ? Buy).recover { case _ => false }
     }
     val codes = Future.sequence(tests).futureValue
     codes.length should be (runs)
+    codes.collect{ case Receipt(amount, code) if amount == 15 => code }.length should be (runs)
+  }
+
+  "restart visitor actor" in {
+    val shop = system.actorOf(Shop.props(true))
+    val tests = for {i <- 1 to runs} yield {
+      shop ! Shop.Enter
+      val cart = expectMsgPF(1 second) {
+        case Shop.Cart(x) => x
+      }
+      logger.info(s"starting shopping with ${cart.path.name} ...")
+      cart ! AddItem(Item("book.1", "Some name", 12))
+      cart ! AddItem(Item("journal.1", "Another name", 3))
+      (cart ? Buy).recover { case _ => false }
+    }
+    val codes = Future.sequence(tests).futureValue
+    codes.length should be (runs)
+    codes.collect{ case Receipt(amount, code) if amount == 15 => code }.length should be < runs
   }
 }
