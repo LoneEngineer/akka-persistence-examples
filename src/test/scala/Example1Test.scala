@@ -54,4 +54,20 @@ class Example1Test extends WordSpecLike with TestKitBase with ImplicitSender wit
     codes.length should be (runs)
     codes.collect{ case Receipt(amount, code) if amount == 15 => code }.length should be < runs
   }
+
+  "visitor's cart is full" in {
+    val shop = system.actorOf(Shop.props(false))
+    shop ! Shop.Enter
+    val cart = expectMsgPF(1 second) {
+      case Shop.Cart(x) => x
+    }
+    logger.info(s"starting shopping with ${cart.path.name} ...")
+    for { i <- 1 to 10 } { cart ! AddItem(Item(s"book.$i", s"Some name #$i", 10)) }
+    (cart ? GetCurrentCart).futureValue match {
+      case FullShoppingCar(items) =>
+        // ok
+      case _:ShoppingCart =>
+        fail("cart should be full")
+    }
+  }
 }

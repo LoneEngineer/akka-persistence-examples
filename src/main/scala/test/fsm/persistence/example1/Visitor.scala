@@ -57,6 +57,12 @@ case class NonEmptyShoppingCart(items: Seq[Item]) extends ShoppingCart {
   def amount = items.map(_.price).sum
 }
 
+case class FullShoppingCar(items: Seq[Item]) extends ShoppingCart {
+  def addItem(item: Item) = throw new IllegalArgumentException(s"cart is full - you cannot add more items")
+  def empty() = EmptyShoppingCart
+  def amount = items.map(_.price).sum
+}
+
 object Visitor {
   def props(id: String, validator: ActorRef, unstable: Boolean) = Props(new Visitor(id, validator, unstable))
 }
