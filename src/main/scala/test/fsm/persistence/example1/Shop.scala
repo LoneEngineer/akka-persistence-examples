@@ -15,7 +15,7 @@ class Shop extends Actor with ActorLogging {
     case NonFatal(_) => SupervisorStrategy.Restart
   })
 
-  lazy val validator = context.actorOf(FraudDetector.props)
+  val validator = context.actorOf(FraudDetector.props)
 
   override def receive = running(Set.empty)
 

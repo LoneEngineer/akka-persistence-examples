@@ -62,7 +62,7 @@ object Visitor {
 
 class Visitor(id: String, validator: ActorRef) extends PersistentFSM[UserState, ShoppingCart, DomainEvent] with ActorLogging {
 
-  override val persistenceId: String = s"${context.system.name}.Shop.v1"
+  override val persistenceId: String = s"${context.system.name}.Visitor.$id.v1"
   override def domainEventClassTag: ClassTag[DomainEvent] = classTag[DomainEvent]
   override def applyEvent(event: DomainEvent, cartBeforeEvent: ShoppingCart): ShoppingCart = {
     event match {
@@ -97,7 +97,6 @@ class Visitor(id: String, validator: ActorRef) extends PersistentFSM[UserState, 
     case Event(Buy, _) =>
       goto(Validation) applying OrderExecuted andThen {
         case cart =>
-
           validator ! FraudDetector.Validate(sender().path, cart.amount)
       }
     case Event(Leave, _) =>
